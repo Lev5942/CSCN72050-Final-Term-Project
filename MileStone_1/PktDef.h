@@ -85,7 +85,8 @@ public:
 
     // CRC 
     bool CheckCRC(char* buffer, int size);
-    unsigned char CalcCRC(const char* buffer, int size);
+    void CalcCRC();
+
 
     // Serialization 
     char* GenPacket();

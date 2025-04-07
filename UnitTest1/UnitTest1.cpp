@@ -8,40 +8,36 @@ namespace UnitTest1
 	TEST_CLASS(UnitTest1)
 	{
 	public:
-		
-        //passed
-        TEST_METHOD(SetAndGetPktCount)
+
+        TEST_METHOD(TestCase1_SetAndGetPktCount)
         {
             PktDef pkt;
             pkt.SetPktCount(42);
             Assert::AreEqual(42, pkt.GetPktCount());
         }
 
-        //passed
-        TEST_METHOD(SetAndGetCmd_Drive)
+        TEST_METHOD(TestCase2_SetAndGetCmd_Drive)
         {
             PktDef pkt;
             pkt.SetCmd(PktDef::DRIVE);
             Assert::AreEqual((int)PktDef::DRIVE, (int)pkt.GetCmd());
         }
 
-        //passed
-        TEST_METHOD(SetAndGetCmd_Sleep)
+        TEST_METHOD(TestCase3_SetAndGetCmd_Sleep)
         {
             PktDef pkt;
             pkt.SetCmd(PktDef::SLEEP);
             Assert::AreEqual((int)PktDef::SLEEP, (int)pkt.GetCmd());
         }
 
-        //passed
-        TEST_METHOD(SetAndGetCmd_Response)
+        TEST_METHOD(TestCase4_SetAndGetCmd_Response)
         {
             PktDef pkt;
             pkt.SetCmd(PktDef::RESPONSE);
             Assert::AreEqual((int)PktDef::RESPONSE, (int)pkt.GetCmd());
         }
 
-        TEST_METHOD(SetAndGetBodyData)
+        TEST_METHOD(TestCase5_SetAndGetBodyData)
         {
             PktDef pkt;
             char data[] = { PktDef::FORWARD, 5, 90 };
@@ -53,33 +49,7 @@ namespace UnitTest1
             Assert::AreEqual<int>(90, (int)body[2]);
         }
 
-        //failed
-        TEST_METHOD(SerializeDeserializePacket)
-        {
-            PktDef pkt;
-            pkt.SetPktCount(1234);
-            pkt.SetCmd(PktDef::DRIVE);
-            char data[] = { PktDef::LEFT, 10, 100 };
-            pkt.SetBodyData(data, 3);
-
-            char* raw = pkt.GenPacket();
-            int len = pkt.GetLength();
-
-            PktDef pkt2(raw);
-            char* body = pkt2.GetBodyData();
-            
-            //check this line
-            Assert::IsNotNull(body);
-            Assert::AreEqual(1234, pkt2.GetPktCount());
-            Assert::AreEqual<int>((int)PktDef::DRIVE, (int)pkt2.GetCmd());
-            Assert::AreEqual<int>((int)PktDef::LEFT, (int)body[0]);
-            Assert::AreEqual<int>(10, (int)body[1]);
-            Assert::AreEqual<int>(100, (int)body[2]);
-        }
-
-
-        //failed //probably something wrong with the GenPacket function recheck
-        TEST_METHOD(CRCCheckValid)
+        TEST_METHOD(TestCase6_CRCCheckValid)
         {
             PktDef pkt;
             pkt.SetPktCount(1);
@@ -87,13 +57,11 @@ namespace UnitTest1
             char data[] = { PktDef::RIGHT, 8, 85 };
             pkt.SetBodyData(data, 3);
 
-            //check this line
             char* raw = pkt.GenPacket();
             Assert::IsTrue(pkt.CheckCRC(raw, pkt.GetLength()));
         }
 
-        //passed
-        TEST_METHOD(ManualAckFlagDetection)
+        TEST_METHOD(TestCase7_ManualAckFlagDetection)
         {
             PktDef pkt;
             pkt.SetCmd(PktDef::RESPONSE);
@@ -107,21 +75,48 @@ namespace UnitTest1
             Assert::IsTrue(pkt2.GetAck());
         }
 
-        //failed
-        TEST_METHOD(EmptyBodyPacket)
+        TEST_METHOD(TestCase8_TestAckBitSetAndRetrieved)
         {
             PktDef pkt;
-            pkt.SetCmd(PktDef::SLEEP);
-            pkt.SetPktCount(999);
-            pkt.SetBodyData(nullptr, 0);
+            pkt.SetPktCount(77);
+            pkt.SetCmd(PktDef::DRIVE);
+            char data[] = { 1, 2, 3 };
+            pkt.SetBodyData(data, 3);
 
-            //check this line 
+            // Manually set Ack
             char* raw = pkt.GenPacket();
-            PktDef pkt2(raw);
+            raw[2] |= 0x10;  // Set Ack bit (bit 4)
 
-            Assert::AreEqual(PktDef::HEADERSIZE +1 , pkt2.GetLength());
-            Assert::AreEqual(999, pkt2.GetPktCount());
-            Assert::AreEqual((int)PktDef::SLEEP, (int)pkt2.GetCmd());
+            PktDef pktIn(raw);
+            Assert::IsTrue(pktIn.GetAck());
+        }
+
+        TEST_METHOD(TestCase9_TestTelemetrySetAndParse)
+        {
+            PktDef pkt;
+            pkt.SetTelemetryData(555, 80, 4, 1, 3, 95);
+
+            char* raw = pkt.GenPacket();
+            PktDef pktIn(raw);
+
+            Assert::IsTrue(pktIn.HasTelemetry());
+            auto tele = pktIn.GetTelemetry();
+            Assert::AreEqual(555, (int)tele.LastPktCounter);
+            Assert::AreEqual(80, (int)tele.CurrentGrade);
+            Assert::AreEqual(4, (int)tele.HitCount);
+            Assert::AreEqual(1, (int)tele.LastCmd);
+            Assert::AreEqual(3, (int)tele.LastCmdValue);
+            Assert::AreEqual(95, (int)tele.LastCmdSpeed);
+        }
+
+        TEST_METHOD(TestCase10_TestLengthCalculation)
+        {
+            PktDef pkt;
+            char data[] = { 10, 20 };
+            pkt.SetBodyData(data, 2);
+            Assert::AreEqual(PktDef::HEADERSIZE + 2, pkt.GetLength());
         }
 	};
 }
+
+

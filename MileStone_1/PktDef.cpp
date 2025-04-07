@@ -80,25 +80,83 @@ int PktDef::GetPktCount() {
     return packet.header.PktCount;
 }
 
+//bool PktDef::CheckCRC(char* buffer, int size) {
+//    return CalcCRC(buffer, size - 1) == static_cast<unsigned char>(buffer[size - 1]);
+//}
+
 bool PktDef::CheckCRC(char* buffer, int size) {
-    return CalcCRC(buffer, size - 1) == static_cast<unsigned char>(buffer[size - 1]);
+    int expectedCRC = buffer[size - 1];
+
+    // Extract bodyLen from buffer
+    int bodyLen = buffer[3] - HEADERSIZE;
+
+    // Temporarily decode header for CRC logic
+    unsigned short pktCount = (buffer[0] << 8) | buffer[1];
+    unsigned char flags = buffer[2];
+    unsigned char len = buffer[3];
+
+    int count = 0;
+    for (int i = 0; i < 16; ++i) count += 1 & (pktCount >> i);
+    count += 1 & ((flags >> 7) & 0x1); // Drive
+    count += 1 & ((flags >> 6) & 0x1); // Status
+    count += 1 & ((flags >> 5) & 0x1); // Sleep
+    count += 1 & ((flags >> 4) & 0x1); // Ack
+    for (int i = 0; i < 4; ++i) count += 1 & ((flags >> i) & 0x1); // Padding
+    for (int i = 0; i < 8; ++i) count += 1 & (len >> i);
+    for (int i = 0; i < bodyLen; ++i)
+        for (int b = 0; b < 8; ++b)
+            count += 1 & (buffer[4 + i] >> b);
+
+    return expectedCRC == (count & 0xFF);
 }
 
-unsigned char PktDef::CalcCRC(const char* buffer, int size) {
-    int ones = 0;
-    for (int i = 0; i < size; ++i) {
-        unsigned char byte = buffer[i];
-        for (int b = 0; b < 8; ++b)
-            ones += (byte >> b) & 0x1;
+
+void PktDef::CalcCRC() {
+    int count = 0;
+
+    // PktCount: 16 bits
+    for (int i = 0; i < 16; ++i) {
+        count += 1 & (packet.header.PktCount >> i);
     }
-    return static_cast<unsigned char>(ones & 0xFF);
+
+    // Flags
+    count += 1 & packet.header.Drive;
+    count += 1 & packet.header.Status;
+    count += 1 & packet.header.Sleep;
+    count += 1 & packet.header.Ack;
+
+    // Padding (4 bits)
+    for (int i = 0; i < 4; ++i) {
+        count += 1 & (packet.header.Padding >> i);
+    }
+
+    // Length: 8 bits
+    for (int i = 0; i < 8; ++i) {
+        count += 1 & (packet.header.Length >> i);
+    }
+
+    // Body data bits
+    int bodyLen = packet.header.Length - HEADERSIZE;
+    if (packet.Data != nullptr) {
+        for (int i = 0; i < bodyLen; ++i) {
+            for (int b = 0; b < 8; ++b) {
+                count += 1 & (packet.Data[i] >> b);
+            }
+        }
+    }
+
+    // Store CRC
+    packet.CRC = static_cast<unsigned char>(count);
 }
+
+
 
 char* PktDef::GenPacket() {
     delete[] RawBuffer;
     int size = packet.header.Length;
     RawBuffer = new char[size + 1];
 
+    // Serialize header
     RawBuffer[0] = (packet.header.PktCount >> 8) & 0xFF;
     RawBuffer[1] = packet.header.PktCount & 0xFF;
     RawBuffer[2] = (packet.header.Drive << 7) |
@@ -107,11 +165,18 @@ char* PktDef::GenPacket() {
         (packet.header.Ack << 4) |
         (packet.header.Padding & 0x0F);
     RawBuffer[3] = packet.header.Length;
-    memcpy(RawBuffer + 4, packet.Data, size - HEADERSIZE);
-    packet.CRC = CalcCRC(RawBuffer, size);
-    RawBuffer[size] = packet.CRC;
+
+    // Copy body
+    int bodyLen = packet.header.Length - HEADERSIZE;
+    memcpy(RawBuffer + 4, packet.Data, bodyLen);
+
+    // Calculate and store CRC
+    CalcCRC();
+    RawBuffer[4 + bodyLen] = packet.CRC;
+
     return RawBuffer;
 }
+
 
 bool PktDef::HasTelemetry() {
     return hasTelemetry;
