@@ -1,85 +1,63 @@
 #include "PktDef.h"
-#include <cstdlib>
+#include <cstring>
 
-// Default Constructor 
 PktDef::PktDef() {
-    packet.header = { 0 };
     packet.Data = nullptr;
     packet.CRC = 0;
     RawBuffer = nullptr;
+    hasTelemetry = false;
 }
 
-// Constructor from Raw Data 
 PktDef::PktDef(char* raw) {
-    std::memset(&packet.header, 0, sizeof(Header));
-
-    int offset = 0;
-
-    // Read PktCount
-    std::memcpy(&packet.header.PktCount, raw + offset, sizeof(packet.header.PktCount));
-    offset += sizeof(packet.header.PktCount);
-
-    // Read flags
-    unsigned char flagsByte;
-    std::memcpy(&flagsByte, raw + offset, sizeof(flagsByte));
-    packet.header.Drive = (flagsByte >> 7) & 0x01;
-    packet.header.Status = (flagsByte >> 6) & 0x01;
-    packet.header.Sleep = (flagsByte >> 5) & 0x01;
-    packet.header.Ack = (flagsByte >> 4) & 0x01;
-    packet.header.Padding = flagsByte & 0x0F;
-    offset += sizeof(flagsByte);
-
-    // Read Length
-    std::memcpy(&packet.header.Length, raw + offset, sizeof(packet.header.Length));
-    offset += sizeof(packet.header.Length);
-
-    // Body size
-    int bodySize = packet.header.Length - HEADERSIZE;
-
-    if (bodySize > 0) {
-        packet.Data = new char[bodySize];
-        std::memcpy(packet.Data, raw + offset, bodySize);
-        offset += bodySize;
-    }
-    else {
-        packet.Data = nullptr;
-    }
-
-    // Read CRC
-    std::memcpy(&packet.CRC, raw + offset, sizeof(packet.CRC));
-
     RawBuffer = nullptr;
-}
+    hasTelemetry = false;
 
+    packet.header.PktCount = (raw[0] << 8) | raw[1];
+    packet.header.Drive = (raw[2] >> 7) & 0x1;
+    packet.header.Status = (raw[2] >> 6) & 0x1;
+    packet.header.Sleep = (raw[2] >> 5) & 0x1;
+    packet.header.Ack = (raw[2] >> 4) & 0x1;
+    packet.header.Padding = raw[2] & 0xF;
+    packet.header.Length = raw[3];
 
-// Set Command Type 
-void PktDef::SetCmd(CmdType cmd) {
-    packet.header.Drive = 0;
-    packet.header.Status = 0;
-    packet.header.Sleep = 0;
+    int bodyLen = packet.header.Length - HEADERSIZE;
+    packet.Data = new char[bodyLen];
+    memcpy(packet.Data, raw + 4, bodyLen);
+    packet.CRC = raw[4 + bodyLen];
 
-    switch (cmd) {
-    case DRIVE: packet.header.Drive = 1; break;
-    case SLEEP: packet.header.Sleep = 1; break;
-    case RESPONSE: packet.header.Status = 1; break;
+    if (packet.header.Status == 1 && bodyLen == 9) {
+        telemetryData.LastPktCounter = (packet.Data[0] << 8) | packet.Data[1];
+        telemetryData.CurrentGrade = (packet.Data[2] << 8) | packet.Data[3];
+        telemetryData.HitCount = (packet.Data[4] << 8) | packet.Data[5];
+        telemetryData.LastCmd = packet.Data[6];
+        telemetryData.LastCmdValue = packet.Data[7];
+        telemetryData.LastCmdSpeed = packet.Data[8];
+        hasTelemetry = true;
     }
 }
 
-// Set Packet Count 
+PktDef::~PktDef() {
+    delete[] packet.Data;
+    delete[] RawBuffer;
+}
+
+void PktDef::SetCmd(CmdType cmd) {
+    packet.header.Drive = (cmd == DRIVE);
+    packet.header.Sleep = (cmd == SLEEP);
+    packet.header.Status = (cmd == RESPONSE);
+}
+
+void PktDef::SetBodyData(char* data, int size) {
+    delete[] packet.Data;
+    packet.Data = new char[size];
+    memcpy(packet.Data, data, size);
+    packet.header.Length = HEADERSIZE + size;
+}
+
 void PktDef::SetPktCount(int count) {
     packet.header.PktCount = count;
 }
 
-// Set Body Data 
-void PktDef::SetBodyData(char* data, int size) {
-    if (packet.Data) delete[] packet.Data;
-
-    packet.Data = new char[size];
-    std::memcpy(packet.Data, data, size);
-    packet.header.Length = HEADERSIZE + size;
-}
-
-// Get Command Type 
 PktDef::CmdType PktDef::GetCmd() {
     if (packet.header.Drive) return DRIVE;
     if (packet.header.Sleep) return SLEEP;
@@ -102,86 +80,69 @@ int PktDef::GetPktCount() {
     return packet.header.PktCount;
 }
 
-// CRC 
-void PktDef::CalcCRC() {
-    unsigned char count = 0;
-    int bodyLen = packet.header.Length - HEADERSIZE;
-
-    // Count bits from Header
-    unsigned char* rawHeader = reinterpret_cast<unsigned char*>(&packet.header);
-    for (int i = 0; i < 5; ++i) {  // 2 bytes (PktCount) + 1 (flags) + 2 (Length)
-        unsigned char byte = rawHeader[i];
-        while (byte) {
-            count += byte & 1;
-            byte >>= 1;
-        }
-    }
-
-    // Count bits from Data
-    for (int i = 0; i < bodyLen; ++i) {
-        unsigned char byte = static_cast<unsigned char>(packet.Data[i]);
-        while (byte) {
-            count += byte & 1;
-            byte >>= 1;
-        }
-    }
-
-    packet.CRC = count;
-}
-
-
-// Check CRC from buffer 
 bool PktDef::CheckCRC(char* buffer, int size) {
-    unsigned char count = 0;
-    for (int i = 0; i < size - 1; ++i) {
-        unsigned char byte = buffer[i];
-        for (int b = 0; b < 8; ++b) {
-            if (byte & (1 << b)) count++;
-        }
-    }
-    return count == (unsigned char)buffer[size - 1];
+    return CalcCRC(buffer, size - 1) == static_cast<unsigned char>(buffer[size - 1]);
 }
 
-// Generate Packet 
-char* PktDef::GenPacket() {
-    if (RawBuffer) {
-        delete[] RawBuffer;
+unsigned char PktDef::CalcCRC(const char* buffer, int size) {
+    int ones = 0;
+    for (int i = 0; i < size; ++i) {
+        unsigned char byte = buffer[i];
+        for (int b = 0; b < 8; ++b)
+            ones += (byte >> b) & 0x1;
     }
+    return static_cast<unsigned char>(ones & 0xFF);
+}
 
-    int totalSize = packet.header.Length;
-    int bodySize = totalSize - HEADERSIZE;
+char* PktDef::GenPacket() {
+    delete[] RawBuffer;
+    int size = packet.header.Length;
+    RawBuffer = new char[size + 1];
 
-    RawBuffer = new char[totalSize];
-    std::memset(RawBuffer, 0, totalSize);
-
-    int offset = 0;
-
-    // Copy PktCount
-    std::memcpy(RawBuffer + offset, &packet.header.PktCount, sizeof(packet.header.PktCount));
-    offset += sizeof(packet.header.PktCount);
-
-    // Combine flags into one byte
-    unsigned char flagsByte = (packet.header.Drive << 7) |
+    RawBuffer[0] = (packet.header.PktCount >> 8) & 0xFF;
+    RawBuffer[1] = packet.header.PktCount & 0xFF;
+    RawBuffer[2] = (packet.header.Drive << 7) |
         (packet.header.Status << 6) |
         (packet.header.Sleep << 5) |
         (packet.header.Ack << 4) |
         (packet.header.Padding & 0x0F);
-    std::memcpy(RawBuffer + offset, &flagsByte, sizeof(flagsByte));
-    offset += sizeof(flagsByte);
-
-    // Copy Length
-    std::memcpy(RawBuffer + offset, &packet.header.Length, sizeof(packet.header.Length));
-    offset += sizeof(packet.header.Length);
-
-    // Copy Data
-    if (bodySize > 0 && packet.Data) {
-        std::memcpy(RawBuffer + offset, packet.Data, bodySize);
-        offset += bodySize;
-    }
-
-    // Calculate and append CRC
-    CalcCRC();
-    std::memcpy(RawBuffer + offset, &packet.CRC, sizeof(packet.CRC));
-
+    RawBuffer[3] = packet.header.Length;
+    memcpy(RawBuffer + 4, packet.Data, size - HEADERSIZE);
+    packet.CRC = CalcCRC(RawBuffer, size);
+    RawBuffer[size] = packet.CRC;
     return RawBuffer;
+}
+
+bool PktDef::HasTelemetry() {
+    return hasTelemetry;
+}
+
+PktDef::Telemetry PktDef::GetTelemetry() {
+    return telemetryData;
+}
+
+void PktDef::SetTelemetryData(unsigned short int lastPkt, unsigned short int grade, unsigned short int hits,
+    unsigned char cmd, unsigned char val, unsigned char spd) {
+    telemetryData.LastPktCounter = lastPkt;
+    telemetryData.CurrentGrade = grade;
+    telemetryData.HitCount = hits;
+    telemetryData.LastCmd = cmd;
+    telemetryData.LastCmdValue = val;
+    telemetryData.LastCmdSpeed = spd;
+    hasTelemetry = true;
+
+    packet.header.Status = 1;
+    packet.header.Length = HEADERSIZE + 9;
+
+    delete[] packet.Data;
+    packet.Data = new char[9];
+    packet.Data[0] = lastPkt >> 8;
+    packet.Data[1] = lastPkt & 0xFF;
+    packet.Data[2] = grade >> 8;
+    packet.Data[3] = grade & 0xFF;
+    packet.Data[4] = hits >> 8;
+    packet.Data[5] = hits & 0xFF;
+    packet.Data[6] = cmd;
+    packet.Data[7] = val;
+    packet.Data[8] = spd;
 }

@@ -15,28 +15,35 @@ public:
     static const unsigned char BACKWARD = 2;
     static const unsigned char RIGHT = 3;
     static const unsigned char LEFT = 4;
-    static const int HEADERSIZE = 6;  // 2 (PktCount) + 1 (flags+pad) + 2 (Length) + 1 (CRC) = 6
+    static const int HEADERSIZE = 5;  // 2 (PktCount) + 1 (flags+pad) + 1 (Length) + 1 (CRC)
 
     // Enums 
     enum CmdType { DRIVE, SLEEP, RESPONSE };
 
     // Structs 
-    struct Header
-    {
+    struct Header {
         unsigned short int PktCount;
         unsigned char Status : 1;
-        unsigned char Drive;
+        unsigned char Drive : 1;
         unsigned char Sleep : 1;
         unsigned char Ack : 1;
         unsigned char Padding : 4;
-        unsigned char Length : 8;
+        unsigned short int Length : 8;
     };
 
-    struct Drivebody
-    {
+    struct Drivebody {
         unsigned char Direction;
         unsigned char Duration;
         unsigned char Speed;
+    };
+
+    struct Telemetry {
+        unsigned short int LastPktCounter;
+        unsigned short int CurrentGrade;
+        unsigned short int HitCount;
+        unsigned char LastCmd;
+        unsigned char LastCmdValue;
+        unsigned char LastCmdSpeed;
     };
 
 private:
@@ -49,15 +56,23 @@ private:
     CmdPacket packet;
     char* RawBuffer;
 
+    Telemetry telemetryData;
+    bool hasTelemetry = false;
+
 public:
     // Constructors 
     PktDef();
     PktDef(char* raw);
 
+    //Destructor
+    ~PktDef();
+
     // Setters 
     void SetCmd(CmdType cmd);
     void SetBodyData(char* data, int size);
     void SetPktCount(int count);
+    void SetTelemetryData(unsigned short int lastPkt, unsigned short int grade, unsigned short int hits,
+        unsigned char cmd, unsigned char val, unsigned char spd);
 
     // Getters 
     CmdType GetCmd();
@@ -65,14 +80,15 @@ public:
     int GetLength();
     char* GetBodyData();
     int GetPktCount();
+    bool HasTelemetry();
+    Telemetry GetTelemetry();
 
     // CRC 
     bool CheckCRC(char* buffer, int size);
-    void CalcCRC();
+    unsigned char CalcCRC(const char* buffer, int size);
 
     // Serialization 
     char* GenPacket();
 };
 
 #endif
-
