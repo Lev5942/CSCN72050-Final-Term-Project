@@ -9,7 +9,6 @@
 
 using namespace std;
 
-
 void PrintPkt(PktDef& pkt) {
     cout << "PktCount: " << pkt.GetPktCount() << endl;
     cout << "Command: ";

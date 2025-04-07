@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34714.143
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MileStone1", "MileStone1\MileStone1.vcxproj", "{D9894257-2952-4B17-82C8-8264A3F05A77}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MileStone_1", "MileStone_1\MileStone_1.vcxproj", "{EA0A8314-93F3-4F49-A1AC-071ACCDFD1F9}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitTest1", "UnitTest1\UnitTest1.vcxproj", "{7A372122-819B-4956-AAE3-82C79A55DB5E}"
@@ -19,18 +17,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{D9894257-2952-4B17-82C8-8264A3F05A77}.Debug|Any CPU.ActiveCfg = Debug|x64
-		{D9894257-2952-4B17-82C8-8264A3F05A77}.Debug|Any CPU.Build.0 = Debug|x64
-		{D9894257-2952-4B17-82C8-8264A3F05A77}.Debug|x64.ActiveCfg = Debug|x64
-		{D9894257-2952-4B17-82C8-8264A3F05A77}.Debug|x64.Build.0 = Debug|x64
-		{D9894257-2952-4B17-82C8-8264A3F05A77}.Debug|x86.ActiveCfg = Debug|Win32
-		{D9894257-2952-4B17-82C8-8264A3F05A77}.Debug|x86.Build.0 = Debug|Win32
-		{D9894257-2952-4B17-82C8-8264A3F05A77}.Release|Any CPU.ActiveCfg = Release|x64
-		{D9894257-2952-4B17-82C8-8264A3F05A77}.Release|Any CPU.Build.0 = Release|x64
-		{D9894257-2952-4B17-82C8-8264A3F05A77}.Release|x64.ActiveCfg = Release|x64
-		{D9894257-2952-4B17-82C8-8264A3F05A77}.Release|x64.Build.0 = Release|x64
-		{D9894257-2952-4B17-82C8-8264A3F05A77}.Release|x86.ActiveCfg = Release|Win32
-		{D9894257-2952-4B17-82C8-8264A3F05A77}.Release|x86.Build.0 = Release|Win32
 		{EA0A8314-93F3-4F49-A1AC-071ACCDFD1F9}.Debug|Any CPU.ActiveCfg = Debug|x64
 		{EA0A8314-93F3-4F49-A1AC-071ACCDFD1F9}.Debug|Any CPU.Build.0 = Debug|x64
 		{EA0A8314-93F3-4F49-A1AC-071ACCDFD1F9}.Debug|x64.ActiveCfg = Debug|x64

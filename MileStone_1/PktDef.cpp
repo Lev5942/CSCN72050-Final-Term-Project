@@ -149,8 +149,6 @@ void PktDef::CalcCRC() {
     packet.CRC = static_cast<unsigned char>(count);
 }
 
-
-
 char* PktDef::GenPacket() {
     delete[] RawBuffer;
     int size = packet.header.Length;
