@@ -31,7 +31,6 @@ void PrintPkt(PktDef& pkt) {
     }
 }
 
-// Function to send a packet to the robot and receive a response
 char* sendPkt(PktDef pkt) {
     char* data = pkt.GenPacket();
     int pktSize = pkt.GetLength();
