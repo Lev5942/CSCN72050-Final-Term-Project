@@ -15,7 +15,7 @@ public:
     static const unsigned char BACKWARD = 2;
     static const unsigned char RIGHT = 3;
     static const unsigned char LEFT = 4;
-    static const int HEADERSIZE = 5;  // 2 (PktCount) + 1 (flags+pad) + 1 (Length) + 1 (CRC)
+    static const int HEADERSIZE = 4; 
 
     // Enums 
     enum CmdType { DRIVE, SLEEP, RESPONSE };
