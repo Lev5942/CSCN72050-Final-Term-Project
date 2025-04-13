@@ -130,7 +130,7 @@ namespace UnitTest1
             // Check that total length is header + body
             Assert::AreEqual(PktDef::HEADERSIZE + 2, pkt.GetLength());
         }
-	};
+    };
 }
 
 
