@@ -29,13 +29,13 @@ public:
         unsigned char Ack : 1;
         unsigned char Padding : 4;
         unsigned short int Length : 8;
-    };
+    }HEADER;
 
     struct Drivebody {
         unsigned char Direction;
         unsigned char Duration;
         unsigned char Speed;
-    };
+    }DRIVEBODY;
 
     struct Telemetry {
         unsigned short int LastPktCounter;
@@ -44,7 +44,7 @@ public:
         unsigned char LastCmd;
         unsigned char LastCmdValue;
         unsigned char LastCmdSpeed;
-    };
+    }TELEMETRY;
 
 private:
     struct CmdPacket {

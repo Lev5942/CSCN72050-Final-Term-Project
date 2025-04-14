@@ -10,6 +10,40 @@ PktDef::PktDef() {
 }
 
 // Constructor that parses a received raw buffer into a packet
+//PktDef::PktDef(char* raw) {
+//    RawBuffer = nullptr;
+//    hasTelemetry = false;
+//
+//    // Deserialize header
+//    packet.header.PktCount = (raw[0] << 8) | raw[1]; // 2 bytes: big-endian
+//    packet.header.Drive = (raw[2] >> 7) & 0x1;        // Flag bits
+//    packet.header.Status = (raw[2] >> 6) & 0x1;
+//    packet.header.Sleep = (raw[2] >> 5) & 0x1;
+//    packet.header.Ack = (raw[2] >> 4) & 0x1;
+//    packet.header.Padding = raw[2] & 0xF;             // Lower 4 bits
+//    packet.header.Length = raw[3];                    // Length byte
+//
+//    int bodyLen = packet.header.Length - HEADERSIZE;
+//
+//    // Copy body data (if any)
+//    packet.Data = new char[bodyLen];
+//    memcpy(packet.Data, raw + 4, bodyLen);
+//
+//    // Last byte is CRC
+//    packet.CRC = raw[4 + bodyLen];
+//
+//    // If this is a telemetry response with a body of 9 bytes, decode it
+//    if (packet.header.Status == 1 && bodyLen == 9) {
+//        telemetryData.LastPktCounter = (packet.Data[0] << 8) | packet.Data[1];
+//        telemetryData.CurrentGrade = (packet.Data[2] << 8) | packet.Data[3];
+//        telemetryData.HitCount = (packet.Data[4] << 8) | packet.Data[5];
+//        telemetryData.LastCmd = packet.Data[6];
+//        telemetryData.LastCmdValue = packet.Data[7];
+//        telemetryData.LastCmdSpeed = packet.Data[8];
+//        hasTelemetry = true;
+//    }
+//}
+
 PktDef::PktDef(char* raw) {
     RawBuffer = nullptr;
     hasTelemetry = false;
@@ -23,7 +57,7 @@ PktDef::PktDef(char* raw) {
     packet.header.Padding = raw[2] & 0xF;             // Lower 4 bits
     packet.header.Length = raw[3];                    // Length byte
 
-    int bodyLen = packet.header.Length - HEADERSIZE;
+    int bodyLen = packet.header.Length - HEADERSIZE;  // Adjust for new header size
 
     // Copy body data (if any)
     packet.Data = new char[bodyLen];
@@ -43,6 +77,7 @@ PktDef::PktDef(char* raw) {
         hasTelemetry = true;
     }
 }
+
 
 // Destructor: free dynamically allocated memory
 PktDef::~PktDef() {
@@ -125,54 +160,221 @@ bool PktDef::CheckCRC(char* buffer, int size) {
     return expectedCRC == (count & 0xFF);
 }
 
-// Calculate CRC using bit-counting algorithm and store it
+//// Calculate CRC using bit-counting algorithm and store it
+//void PktDef::CalcCRC() {
+//    int count = 0;
+//
+//    // Count 1-bits in PktCount (16 bits)
+//    for (int i = 0; i < 16; ++i) {
+//        count += 1 & (packet.header.PktCount >> i);
+//    }
+//
+//    // Flags
+//    count += 1 & packet.header.Drive;
+//    count += 1 & packet.header.Status;
+//    count += 1 & packet.header.Sleep;
+//    count += 1 & packet.header.Ack;
+//
+//    // Padding (4 bits)
+//    for (int i = 0; i < 4; ++i) {
+//        count += 1 & (packet.header.Padding >> i);
+//    }
+//
+//    // Length (8 bits)
+//    for (int i = 0; i < 8; ++i) {
+//        count += 1 & (packet.header.Length >> i);
+//    }
+//
+//    // Count 1-bits in body data
+//    int bodyLen = packet.header.Length - HEADERSIZE;
+//    if (packet.Data != nullptr) {
+//        for (int i = 0; i < bodyLen; ++i) {
+//            for (int b = 0; b < 8; ++b) {
+//                count += 1 & (packet.Data[i] >> b);
+//            }
+//        }
+//    }
+//
+//    // Store CRC as 8-bit value
+//    packet.CRC = static_cast<unsigned char>(count);
+//}
+
+//void PktDef::CalcCRC() {
+//    // Set CRC to 0 before calculation
+//    packet.CRC = 0;
+//
+//    // Create a temporary buffer to simulate the packet layout for CRC calculation
+//    int totalLength = packet.header.Length;
+//    std::unique_ptr<char[]> tempBuffer(new char[totalLength]);
+//
+//    // Copy header
+//    std::memcpy(tempBuffer.get(), &packet.header, sizeof(packet.header));
+//
+//    // Copy data if any
+//    if (packet.Data != nullptr && totalLength > sizeof(packet.header) + 1) {
+//        std::memcpy(tempBuffer.get() + sizeof(packet.header), packet.Data, totalLength - sizeof(packet.header) - 1);
+//    }
+//
+//    // Calculate XOR-based CRC
+//    unsigned char result = 0;
+//    for (int i = 0; i < totalLength - 1; ++i) {  // exclude CRC itself
+//        result ^= tempBuffer[i];
+//    }
+//
+//    packet.CRC = result;
+//}
+
 void PktDef::CalcCRC() {
-    int count = 0;
+    // Set CRC to 0 before calculation
+    packet.CRC = 0;
 
-    // Count 1-bits in PktCount (16 bits)
-    for (int i = 0; i < 16; ++i) {
-        count += 1 & (packet.header.PktCount >> i);
+    // Total packet length = header + body + CRC
+    int totalLength = packet.header.Length;
+
+    // Allocate temporary buffer for header + body (exclude CRC initially)
+    std::unique_ptr<char[]> tempBuffer(new char[totalLength - 1]);
+
+    // Manually serialize the header into tempBuffer[0..3]
+    tempBuffer[0] = (packet.header.PktCount >> 8) & 0xFF; // High byte
+    tempBuffer[1] = packet.header.PktCount & 0xFF;        // Low byte
+    tempBuffer[2] = (packet.header.Drive << 7) | (packet.header.Status << 6) |
+        (packet.header.Sleep << 5) | (packet.header.Ack << 4) |
+        (packet.header.Padding & 0x0F);
+    tempBuffer[3] = packet.header.Length;
+
+    // Copy body if any (Length includes header + body)
+    int bodyLen = totalLength - HEADERSIZE;
+    if (packet.Data && bodyLen > 0) {
+        std::memcpy(tempBuffer.get() + HEADERSIZE, packet.Data, bodyLen);
     }
 
-    // Flags
-    count += 1 & packet.header.Drive;
-    count += 1 & packet.header.Status;
-    count += 1 & packet.header.Sleep;
-    count += 1 & packet.header.Ack;
-
-    // Padding (4 bits)
-    for (int i = 0; i < 4; ++i) {
-        count += 1 & (packet.header.Padding >> i);
+    // XOR all bytes in tempBuffer
+    unsigned char crc = 0;
+    for (int i = 0; i < totalLength - 1; ++i) {
+        crc ^= tempBuffer[i];
     }
 
-    // Length (8 bits)
-    for (int i = 0; i < 8; ++i) {
-        count += 1 & (packet.header.Length >> i);
-    }
-
-    // Count 1-bits in body data
-    int bodyLen = packet.header.Length - HEADERSIZE;
-    if (packet.Data != nullptr) {
-        for (int i = 0; i < bodyLen; ++i) {
-            for (int b = 0; b < 8; ++b) {
-                count += 1 & (packet.Data[i] >> b);
-            }
-        }
-    }
-
-    // Store CRC as 8-bit value
-    packet.CRC = static_cast<unsigned char>(count);
+    // Store CRC
+    packet.CRC = crc;
 }
 
-// Generate raw buffer to send over network
-char* PktDef::GenPacket() {
-    delete[] RawBuffer;
-    int size = packet.header.Length;
-    RawBuffer = new char[size + 1]; // Allocate memory for header + body + CRC
 
-    // Serialize header fields
-    RawBuffer[0] = (packet.header.PktCount >> 8) & 0xFF;
-    RawBuffer[1] = packet.header.PktCount & 0xFF;
+
+//// Generate raw buffer to send over network
+//char* PktDef::GenPacket() {
+//    delete[] RawBuffer;
+//    int size = packet.header.Length;
+//    RawBuffer = new char[size + 1]; // Allocate memory for header + body + CRC
+//
+//    // Serialize header fields
+//    RawBuffer[0] = (packet.header.PktCount >> 8) & 0xFF;
+//    RawBuffer[1] = packet.header.PktCount & 0xFF;
+//    RawBuffer[2] = (packet.header.Drive << 7) |
+//        (packet.header.Status << 6) |
+//        (packet.header.Sleep << 5) |
+//        (packet.header.Ack << 4) |
+//        (packet.header.Padding & 0x0F);
+//    RawBuffer[3] = packet.header.Length;
+//
+//    // Copy body (if any)
+//    int bodyLen = packet.header.Length - HEADERSIZE;
+//    memcpy(RawBuffer + 4, packet.Data, bodyLen);
+//
+//    // Append CRC at end
+//    CalcCRC();
+//    RawBuffer[4 + bodyLen] = packet.CRC;
+//
+//    return RawBuffer;
+//}
+
+//char* PktDef::GenPacket() {
+//    // Total size = header length + 1 byte for CRC
+//    int totalSize = packet.header.Length + 1;
+//
+//    // Cleanup any previously allocated buffer
+//    if (RawBuffer) {
+//        delete[] RawBuffer;
+//    }
+//
+//    RawBuffer = new char[totalSize];
+//
+//    // Copy PktCount (2 bytes)
+//    memcpy(RawBuffer, &packet.header.PktCount, 2);
+//
+//    // Pack command flags into 1 byte
+//    unsigned char flags = 0;
+//    flags |= (packet.header.Status & 0x01) << 0;
+//    flags |= (packet.header.Drive & 0x01) << 1;
+//    flags |= (packet.header.Sleep & 0x01) << 2;
+//    flags |= (packet.header.Ack & 0x01) << 3;
+//    flags |= (packet.header.Padding & 0x0F) << 4;
+//    RawBuffer[2] = flags;
+//
+//    // Copy Length (1 byte)
+//    RawBuffer[3] = packet.header.Length;
+//
+//    // Copy Body (if any)
+//    if (packet.header.Length > HEADERSIZE && packet.Data != nullptr) {
+//        memcpy(RawBuffer + HEADERSIZE, packet.Data, packet.header.Length - HEADERSIZE);
+//    }
+//
+//    // Calculate CRC over [0..Length-1]
+//    unsigned char crc = 0;
+//    for (int i = 0; i < packet.header.Length; i++) {
+//        crc ^= RawBuffer[i];
+//    }
+//
+//    packet.CRC = crc;
+//    RawBuffer[packet.header.Length] = packet.CRC;
+//
+//    return RawBuffer;
+//}
+
+//char* PktDef::GenPacket() {
+//    // Total size = header length + 1 byte for CRC
+//    int totalSize = packet.header.Length + 1;
+//
+//    // Cleanup any previously allocated buffer
+//    delete[] RawBuffer;
+//    RawBuffer = new char[totalSize];
+//
+//    // Serialize header fields
+//    RawBuffer[0] = (packet.header.PktCount >> 8) & 0xFF;
+//    RawBuffer[1] = packet.header.PktCount & 0xFF;
+//    RawBuffer[2] = (packet.header.Drive << 7) |
+//        (packet.header.Status << 6) |
+//        (packet.header.Sleep << 5) |
+//        (packet.header.Ack << 4) |
+//        (packet.header.Padding & 0x0F);
+//    RawBuffer[3] = packet.header.Length;
+//
+//    // Copy body (if any)
+//    int bodyLen = packet.header.Length - HEADERSIZE;
+//    if (bodyLen > 0 && packet.Data != nullptr) {
+//        memcpy(RawBuffer + 4, packet.Data, bodyLen);
+//    }
+//
+//    // Calculate CRC using bit-counting algorithm
+//    CalcCRC();
+//
+//    // Append CRC
+//    RawBuffer[4 + bodyLen] = packet.CRC;
+//
+//    return RawBuffer;
+//}
+
+char* PktDef::GenPacket() {
+    // Cleanup any previously allocated buffer
+    delete[] RawBuffer;
+
+    int bodyLen = packet.header.Length - HEADERSIZE;
+    int totalSize = packet.header.Length + 1; // +1 for CRC
+
+    RawBuffer = new char[totalSize];
+
+    // Serialize header
+    RawBuffer[0] = (packet.header.PktCount >> 8) & 0xFF; // High byte
+    RawBuffer[1] = packet.header.PktCount & 0xFF;        // Low byte
     RawBuffer[2] = (packet.header.Drive << 7) |
         (packet.header.Status << 6) |
         (packet.header.Sleep << 5) |
@@ -180,16 +382,19 @@ char* PktDef::GenPacket() {
         (packet.header.Padding & 0x0F);
     RawBuffer[3] = packet.header.Length;
 
-    // Copy body (if any)
-    int bodyLen = packet.header.Length - HEADERSIZE;
-    memcpy(RawBuffer + 4, packet.Data, bodyLen);
+    // Serialize body data (if any)
+    if (packet.Data != nullptr && bodyLen > 0) {
+        memcpy(RawBuffer + 4, packet.Data, bodyLen);
+    }
 
-    // Append CRC at end
-    CalcCRC();
+    // Calculate and append CRC
+    CalcCRC(); // Updates packet.CRC
     RawBuffer[4 + bodyLen] = packet.CRC;
 
     return RawBuffer;
 }
+
+
 
 // Check if telemetry data is present in this packet
 bool PktDef::HasTelemetry() {
