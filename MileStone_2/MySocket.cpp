@@ -1,21 +1,25 @@
 #include "MySocket.h"
 
+// Constructor initializes socket settings and creates TCP/UDP socket
 MySocket::MySocket(SocketType type, std::string ip, unsigned int port, ConnectionType connType, unsigned int size)
     : mySocket(type), IPAddr(ip), Port(port), connectionType(connType), bTCPConnect(false), MaxSize(size) {
 
+    // Set default buffer size if invalid
     if (MaxSize <= 0) MaxSize = DEFAULT_SIZE;
-    Buffer = new char[MaxSize];
+    Buffer = new char[MaxSize]; // Allocate buffer memory
 
     // Initialize Winsock
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         throw std::runtime_error("WSAStartup failed");
     }
 
+    // Zero out address struct and set address family and port
     memset(&SvrAddr, 0, sizeof(SvrAddr));
     SvrAddr.sin_family = AF_INET;
     SvrAddr.sin_port = htons(Port);
-    inet_pton(AF_INET, IPAddr.c_str(), &SvrAddr.sin_addr);
+    inet_pton(AF_INET, IPAddr.c_str(), &SvrAddr.sin_addr); // Convert IP to binary form
 
+    // Create the socket (TCP or UDP)
     if (connectionType == TCP) {
         ConnectionSocket = socket(AF_INET, SOCK_STREAM, 0);
         if (ConnectionSocket == INVALID_SOCKET) {
@@ -30,12 +34,15 @@ MySocket::MySocket(SocketType type, std::string ip, unsigned int port, Connectio
     }
 }
 
+
+// Destructor: clean up allocated memory and close the socket
 MySocket::~MySocket() {
     delete[] Buffer;
     WSACleanup();
     closesocket(ConnectionSocket);
 }
 
+// General connection function: tries TCP and falls back to UDP if needed
 void MySocket::Connect() {
     if (connectionType == TCP) {
         try {
@@ -52,6 +59,7 @@ void MySocket::Connect() {
     }
 }
 
+// TCP-specific connection handling for both client and server roles
 void MySocket::ConnectTCP() {
     if (mySocket == CLIENT) {
         if (connect(ConnectionSocket, (sockaddr*)&SvrAddr, sizeof(SvrAddr)) == SOCKET_ERROR) {
@@ -61,10 +69,13 @@ void MySocket::ConnectTCP() {
         std::cout << "TCP connection established.\n";
     }
     else if (mySocket == SERVER) {
+        // Bind and listen for incoming connection
         if (bind(ConnectionSocket, (sockaddr*)&SvrAddr, sizeof(SvrAddr)) == SOCKET_ERROR) {
             throw std::runtime_error("TCP server bind failed");
         }
         listen(ConnectionSocket, SOMAXCONN);
+
+        // Accept incoming connection
         sockaddr_in clientAddr;
         int clientSize = sizeof(clientAddr);
         ConnectionSocket = accept(ConnectionSocket, (sockaddr*)&clientAddr, &clientSize);
@@ -75,6 +86,7 @@ void MySocket::ConnectTCP() {
     }
 }
 
+// UDP-specific connection (only binds in server mode)
 void MySocket::ConnectUDP() {
     if (mySocket == SERVER) {
         if (bind(ConnectionSocket, (sockaddr*)&SvrAddr, sizeof(SvrAddr)) == SOCKET_ERROR) {
@@ -87,6 +99,7 @@ void MySocket::ConnectUDP() {
     }
 }
 
+// TCP disconnection (close the socket)
 void MySocket::DisconnectTCP() {
     if (bTCPConnect) {
         closesocket(ConnectionSocket);
@@ -94,6 +107,7 @@ void MySocket::DisconnectTCP() {
     }
 }
 
+// Send data over TCP or UDP depending on mode
 void MySocket::SendData(const char* data, int size) {
     if (connectionType == TCP) {
         if (send(ConnectionSocket, data, size, 0) == SOCKET_ERROR) {
@@ -107,6 +121,7 @@ void MySocket::SendData(const char* data, int size) {
     }
 }
 
+// Receive data over TCP or UDP into the provided output buffer
 int MySocket::GetData(char* outputBuffer) {
     int bytesRead = 0;
     sockaddr_in clientAddr;
@@ -126,10 +141,12 @@ int MySocket::GetData(char* outputBuffer) {
     return bytesRead;
 }
 
+// Get the configured IP address
 std::string MySocket::GetIPAddr() {
     return IPAddr;
 }
 
+// Set a new IP address (only if not connected)
 void MySocket::SetIPAddr(std::string ip) {
     if (bTCPConnect) {
         std::cerr << "Cannot change IP address after connection established.\n";
@@ -139,6 +156,7 @@ void MySocket::SetIPAddr(std::string ip) {
     inet_pton(AF_INET, IPAddr.c_str(), &SvrAddr.sin_addr);
 }
 
+// Set a new port number (only if not connected)
 void MySocket::SetPort(int port) {
     if (bTCPConnect) {
         std::cerr << "Cannot change port after connection established.\n";
@@ -148,14 +166,17 @@ void MySocket::SetPort(int port) {
     SvrAddr.sin_port = htons(Port);
 }
 
+// Return current port
 int MySocket::GetPort() {
     return Port;
 }
 
+// Return current socket role (CLIENT or SERVER)
 SocketType MySocket::GetType() {
     return mySocket;
 }
 
+// Set a new socket role (only if not connected)
 void MySocket::SetType(SocketType type) {
     if (bTCPConnect) {
         std::cerr << "Cannot change socket type after connection established.\n";
