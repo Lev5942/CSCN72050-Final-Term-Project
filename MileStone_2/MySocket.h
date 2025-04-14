@@ -6,6 +6,8 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
+using namespace std;
+
 enum SocketType { CLIENT, SERVER };
 enum ConnectionType { TCP, UDP };
 const int DEFAULT_SIZE = 1024;
@@ -15,7 +17,7 @@ private:
     char* Buffer;
     SOCKET WelcomeSocket;
     SOCKET ConnectionSocket;
-    sockaddr_in SvrAddr;
+    struct sockaddr_in SvrAddr;
     SocketType mySocket;
     std::string IPAddr;
     int Port;
@@ -25,6 +27,7 @@ private:
     WSADATA wsaData;
 
 public:
+    MySocket();
     MySocket(SocketType type, std::string ip, unsigned int port, ConnectionType connType, unsigned int size);
     ~MySocket();
 

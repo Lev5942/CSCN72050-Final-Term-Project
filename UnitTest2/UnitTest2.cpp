@@ -1,6 +1,5 @@
 #include "../MileStone_2/MySocket.h"
 #include "CppUnitTest.h"
-#include <stdexcept>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
@@ -22,13 +21,11 @@ namespace UnitTest2
             MySocket sock(CLIENT, "127.0.0.1", 8080, TCP, 512);
 
             try {
-                sock.ConnectTCP();  // Likely to fail (no server)
+                sock.ConnectTCP();
             }
-            catch (...) {
-                // Connection failed, so bTCPConnect is still false
-            }
+            catch (...) {}
 
-            sock.SetIPAddr("192.168.0.1");  // Should succeed
+            sock.SetIPAddr("192.168.0.1");
             Assert::AreEqual(std::string("192.168.0.1"), sock.GetIPAddr());
         }
 
@@ -37,13 +34,11 @@ namespace UnitTest2
             MySocket sock(CLIENT, "127.0.0.1", 8080, TCP, 512);
 
             try {
-                sock.ConnectTCP();  // Will throw if no server
+                sock.ConnectTCP();
             }
-            catch (...) {
-                // No connection
-            }
+            catch (...) {}
 
-            sock.SetPort(9090);  // Should succeed
+            sock.SetPort(9090);
             Assert::AreEqual(9090, sock.GetPort());
         }
 
@@ -55,37 +50,16 @@ namespace UnitTest2
             Assert::AreEqual((int)SERVER, (int)sock.GetType());
         }
 
-        //TEST_METHOD(TestCase5_UDP_SendReceive_Loopback)
-        //{
-        //    // Set up server
-        //    MySocket server(SERVER, "127.0.0.1", 8050, UDP, 1024);
-        //    server.Connect();  // Bind the server socket
-
-        //    // Set up client
-        //    MySocket client(CLIENT, "127.0.0.1", 8050, UDP, 1024);
-        //    client.Connect();  // Not strictly needed for UDP, but fine if your class requires it
-
-        //    const char* msg = "Hello UDP";
-        //    client.SendData(msg, strlen(msg));
-
-        //    char recvBuf[1024] = {};
-        //    int bytes = server.GetData(recvBuf);
-
-        //    Assert::AreEqual((int)strlen(msg), bytes);
-        //    Assert::IsTrue(std::string(recvBuf, bytes) == std::string(msg));
-        //}
-
-
-        TEST_METHOD(TestCase6_Constructor_ValidParams)
+        TEST_METHOD(TestCase5_Constructor_ValidParams)
         {
             MySocket socket(CLIENT, "127.0.0.1", 8080, TCP, 1024);
 
-            Assert::AreEqual(socket.GetIPAddr(), std::string("127.0.0.1"));
-            Assert::AreEqual(socket.GetPort(), 8080);
-            Assert::AreEqual(socket.GetType(), CLIENT);
+            Assert::AreEqual(std::string("127.0.0.1"), socket.GetIPAddr());
+            Assert::AreEqual(8080, socket.GetPort());
+            Assert::AreEqual(CLIENT, socket.GetType());
         }
 
-        TEST_METHOD(TestCase7_ConnectTCP_Client)
+        TEST_METHOD(TestCase6_ConnectTCP_Client)
         {
             MySocket socket(CLIENT, "127.0.0.1", 8080, TCP, 1024);
             try {
@@ -98,7 +72,7 @@ namespace UnitTest2
             socket.DisconnectTCP();
         }
 
-        TEST_METHOD(TestCase8_ConnectUDP_Client)
+        TEST_METHOD(TestCase7_ConnectUDP_Client)
         {
             MySocket socket(CLIENT, "127.0.0.1", 8080, UDP, 1024);
             try {
@@ -110,7 +84,7 @@ namespace UnitTest2
             }
         }
 
-        TEST_METHOD(TestCase9_ConnectTCP_Server)
+        TEST_METHOD(TestCase8_ConnectTCP_Server)
         {
             MySocket socket(SERVER, "127.0.0.1", 8080, TCP, 1024);
             try {
@@ -123,7 +97,7 @@ namespace UnitTest2
             socket.DisconnectTCP();
         }
 
-        TEST_METHOD(TestCase10_ConnectUDP_Server)
+        TEST_METHOD(TestCase9_ConnectUDP_Server)
         {
             MySocket socket(SERVER, "127.0.0.1", 8080, UDP, 1024);
             try {
@@ -135,13 +109,13 @@ namespace UnitTest2
             }
         }
 
-        TEST_METHOD(TestCase11_SendData_TCP)
+        TEST_METHOD(TestCase10_SendData_TCP)
         {
             MySocket socket(CLIENT, "127.0.0.1", 8080, TCP, 1024);
             try {
                 socket.Connect();
                 const char* testData = "Test Data";
-                socket.SendData(testData, strlen(testData) + 1);
+                socket.SendData(testData, static_cast<int>(strlen(testData) + 1));
             }
             catch (const std::exception& e) {
                 Logger::WriteMessage(e.what());
@@ -150,13 +124,13 @@ namespace UnitTest2
             socket.DisconnectTCP();
         }
 
-        TEST_METHOD(TestCase12_SendData_UDP)
+        TEST_METHOD(TestCase11_SendData_UDP)
         {
             MySocket socket(CLIENT, "127.0.0.1", 8080, UDP, 1024);
             try {
                 socket.Connect();
                 const char* testData = "Test Data";
-                socket.SendData(testData, strlen(testData) + 1);
+                socket.SendData(testData, static_cast<int>(strlen(testData) + 1));
             }
             catch (const std::exception& e) {
                 Logger::WriteMessage(e.what());
@@ -164,7 +138,7 @@ namespace UnitTest2
             }
         }
 
-        TEST_METHOD(TestCase13_GetData_TCP)
+        TEST_METHOD(TestCase12_GetData_TCP)
         {
             MySocket socket(SERVER, "127.0.0.1", 8080, TCP, 1024);
             socket.Connect();
@@ -174,7 +148,7 @@ namespace UnitTest2
             socket.DisconnectTCP();
         }
 
-        TEST_METHOD(TestCase14_GetData_UDP)
+        TEST_METHOD(TestCase13_GetData_UDP)
         {
             MySocket socket(SERVER, "127.0.0.1", 8080, UDP, 1024);
             socket.Connect();
@@ -183,42 +157,43 @@ namespace UnitTest2
             Assert::IsTrue(bytesRead > 0);
         }
 
-        TEST_METHOD(TestCase15_SetGetIPAddr)
+        TEST_METHOD(TestCase14_SetGetIPAddr)
         {
             MySocket socket(CLIENT, "127.0.0.1", 8080, TCP, 1024);
-            Assert::AreEqual(socket.GetIPAddr(), std::string("127.0.0.1"));
+            Assert::AreEqual(std::string("127.0.0.1"), socket.GetIPAddr());
 
             socket.SetIPAddr("192.168.1.1");
-            Assert::AreEqual(socket.GetIPAddr(), std::string("192.168.1.1"));
+            Assert::AreEqual(std::string("192.168.1.1"), socket.GetIPAddr());
         }
 
-        TEST_METHOD(TestCase16_SetGetPort)
+        TEST_METHOD(TestCase15_SetGetPort)
         {
             MySocket socket(CLIENT, "127.0.0.1", 8080, TCP, 1024);
-            Assert::AreEqual(socket.GetPort(), 8080);
+            Assert::AreEqual(8080, socket.GetPort());
 
             socket.SetPort(9090);
-            Assert::AreEqual(socket.GetPort(), 9090);
+            Assert::AreEqual(9090, socket.GetPort());
         }
 
-        TEST_METHOD(TestCase17_SetType)
+        TEST_METHOD(TestCase16_SetType)
         {
             MySocket socket(CLIENT, "127.0.0.1", 8080, TCP, 1024);
-            Assert::AreEqual(socket.GetType(), CLIENT);
+            Assert::AreEqual(CLIENT, socket.GetType());
 
             socket.SetType(SERVER);
-            Assert::AreEqual(socket.GetType(), SERVER);
+            Assert::AreEqual(SERVER, socket.GetType());
         }
 
-        TEST_METHOD(TestCase18_DisconnectTCP)
+        TEST_METHOD(TestCase17_DisconnectTCP)
         {
             MySocket socket(CLIENT, "127.0.0.1", 8080, TCP, 1024);
             socket.Connect();
             socket.DisconnectTCP();
-            Assert::AreEqual(socket.GetType(), SERVER);
+            // Assuming disconnect does not change type, this might be an error. Adjust logic if needed:
+            Assert::AreEqual(CLIENT, socket.GetType());
         }
 
-        TEST_METHOD(TestCase19_InvalidPort)
+        TEST_METHOD(TestCase18_InvalidPort)
         {
             MySocket socket(CLIENT, "127.0.0.1", 8080, TCP, 1024);
             try {

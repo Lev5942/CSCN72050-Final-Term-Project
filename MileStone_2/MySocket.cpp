@@ -1,34 +1,80 @@
 #include "MySocket.h"
 
-MySocket::MySocket(SocketType type, std::string ip, unsigned int port, ConnectionType connType, unsigned int size)
-    : mySocket(type), IPAddr(ip), Port(port), connectionType(connType), bTCPConnect(false), MaxSize(size) {
+MySocket::MySocket() : bTCPConnect(false), MaxSize(DEFAULT_SIZE)
+{
+}
 
-    if (MaxSize <= 0) MaxSize = DEFAULT_SIZE;
+MySocket::MySocket(SocketType type, std::string ip, unsigned int port, ConnectionType connType, unsigned int bufferSize)
+    : mySocket(type), IPAddr(ip), Port(port), connectionType(connType), bTCPConnect(false), MaxSize(DEFAULT_SIZE)
+{
+    // Step 1: Setup buffer size
+    MaxSize = (bufferSize > 0) ? bufferSize : DEFAULT_SIZE;
     Buffer = new char[MaxSize];
 
-    // Initialize Winsock
+    // Step 2: Initialize Winsock (Windows only)
+    std::cout << "Initializing Winsock...\n";
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        throw std::runtime_error("WSAStartup failed");
+        std::cerr << "WSAStartup failed\n";
+        return;
     }
 
+    // Step 3: Clear server address struct
     memset(&SvrAddr, 0, sizeof(SvrAddr));
     SvrAddr.sin_family = AF_INET;
     SvrAddr.sin_port = htons(Port);
-    inet_pton(AF_INET, IPAddr.c_str(), &SvrAddr.sin_addr);
 
-    if (connectionType == TCP) {
-        ConnectionSocket = socket(AF_INET, SOCK_STREAM, 0);
-        if (ConnectionSocket == INVALID_SOCKET) {
-            throw std::runtime_error("TCP socket creation failed");
-        }
-    }
-    else {
+    if (connectionType == UDP) {
+        std::cout << "Setting up UDP socket...\n";
         ConnectionSocket = socket(AF_INET, SOCK_DGRAM, 0);
         if (ConnectionSocket == INVALID_SOCKET) {
-            throw std::runtime_error("UDP socket creation failed");
+            std::cerr << "ERROR: Failed to create UDP socket\n";
+            return;
+        }
+
+        if (mySocket == CLIENT) {
+            std::cout << "Setting up CLIENT (UDP)\n";
+            inet_pton(AF_INET, ip.c_str(), &SvrAddr.sin_addr);
+            std::cout << "CLIENT UDP setup successfully\n";
+        }
+        else if (mySocket == SERVER) {
+            std::cout << "Setting up SERVER (UDP)\n";
+            SvrAddr.sin_addr.s_addr = INADDR_ANY;
+            if (bind(ConnectionSocket, (sockaddr*)&SvrAddr, sizeof(SvrAddr)) == SOCKET_ERROR) {
+                std::cerr << "ERROR: Failed to bind UDP socket\n";
+                closesocket(ConnectionSocket);
+                return;
+            }
+            std::cout << "SERVER UDP setup successfully\n";
+        }
+    }
+    else if (connectionType == TCP) {
+        std::cout << "Setting up TCP socket...\n";
+
+        if (mySocket == CLIENT) {
+            std::cout << "Setting up CLIENT (TCP)\n";
+            ConnectionSocket = socket(AF_INET, SOCK_STREAM, 0);
+            if (ConnectionSocket == INVALID_SOCKET) {
+                std::cerr << "ERROR: Failed to create TCP socket (CLIENT)\n";
+                return;
+            }
+
+            inet_pton(AF_INET, ip.c_str(), &SvrAddr.sin_addr);
+            std::cout << "CLIENT TCP set up successfully\n";
+        }
+        else if (mySocket == SERVER) {
+            std::cout << "Setting up SERVER (TCP)\n";
+            WelcomeSocket = socket(AF_INET, SOCK_STREAM, 0);
+            if (WelcomeSocket == INVALID_SOCKET) {
+                std::cerr << "ERROR: Failed to create TCP socket (SERVER)\n";
+                return;
+            }
+
+            SvrAddr.sin_addr.s_addr = INADDR_ANY;
+            std::cout << "SERVER TCP setup prepared (bind/listen/accept to be handled separately)\n";
         }
     }
 }
+
 
 MySocket::~MySocket() {
     delete[] Buffer;
