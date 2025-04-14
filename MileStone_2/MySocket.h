@@ -22,20 +22,23 @@ private:
     ConnectionType connectionType;
     bool bTCPConnect;
     int MaxSize;
+    WSADATA wsaData;
 
 public:
-    MySocket(SocketType, std::string, unsigned int, ConnectionType, unsigned int);
+    MySocket(SocketType type, std::string ip, unsigned int port, ConnectionType connType, unsigned int size);
     ~MySocket();
 
     void ConnectTCP();
     void DisconnectTCP();
-    void SendData(const char*, int);
-    int GetData(char*);
+    void SendData(const char* data, int size);
+    int GetData(char* outputBuffer);
 
     std::string GetIPAddr();
-    void SetIPAddr(std::string);
-    void SetPort(int);
+    void SetIPAddr(std::string ip);
+    void SetPort(int port);
     int GetPort();
     SocketType GetType();
-    void SetType(SocketType);
+    void SetType(SocketType type);
+    void Connect(); // This function will handle the fallback between TCP and UDP.
+    void ConnectUDP(); // This function will establish a UDP connection.
 };
